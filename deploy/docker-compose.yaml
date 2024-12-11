@@ -1,0 +1,63 @@
+x-localtime: &host_localtime
+  type: bind
+  source: /etc/localtime
+  target: /etc/localtime
+  read_only: true
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      tag: "{{.Name}}"
+      max-size: ${LOG_MAX_SIZE:-5m}
+      max-file: ${LOG_MAX_FILE:-1}
+
+
+services:
+
+
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    restart: always
+    container_name: mongo
+    volumes:
+      - type: volume
+        source: mongo_data
+        target: /data/db
+    ports:
+      - "27017:27017"
+
+
+  app:
+    build: ..
+    container_name: app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+    environment:
+      DB_NAME: ${DB_NAME:?err}
+      DB_URL: ${DB_URL:?err}
+      DB_PORT: ${DB_PORT:?err}
+      DB_COLLECTION: ${DB_COLLECTION:?err}
+    command: python -m src.app
+    restart: unless-stopped
+    <<: *logging
+    networks:
+      - external
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  internal:
+    name: app_internal
+    driver: bridge
+    internal: true
+  external:
+    name: app_external
+    driver: bridge
+
+
